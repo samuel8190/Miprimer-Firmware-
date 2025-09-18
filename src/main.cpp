@@ -1,96 +1,114 @@
-#include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <SPIFFS.h>
-#include <FS.h>
 #include <ArduinoJson.h>
+#include <DHTesp.h>
 
-// ---------- CONFIG WIFI ----------
-const char* WIFI_SSID = "TU_SSID";
-const char* WIFI_PASS = "TU_PASSWORD";
+// ======================= CONFIGURACIÓN =======================
+const char* WIFI_SSID = "Tobar 2";      
+const char* WIFI_PASS = "Homb0549";     
+const int DHT_PIN = 4;                  
+const unsigned long READ_INTERVAL = 2000; // cada 2 segundos
 
-// ---------- WEB SERVER ----------
+// ======================= OBJETOS GLOBALES ====================
 WebServer server(80);
+DHTesp dht;
 
-// ---------- SIMULACIÓN DHT22 ----------
-static float curTemp = 24.0f;
-static float curHum  = 48.0f;
+float lastTemp = NAN;
+float lastHum = NAN;
+unsigned long lastReadMs = 0;
 
-static float clampf(float v, float lo, float hi){ return v < lo ? lo : (v > hi ? hi : v); }
-static void stepSimulation(){
-  // variación suave
-  curTemp = clampf(curTemp + ((int32_t)esp_random()%7 - 3) * 0.05f, 18.0f, 32.0f);
-  curHum  = clampf(curHum  + ((int32_t)esp_random()%7 - 3) * 0.10f, 30.0f, 80.0f);
-}
-
-// ---------- STATIC FILES ----------
-String contentType(const String& path){
-  if (path.endsWith(".html")) return "text/html";
-  if (path.endsWith(".css"))  return "text/css";
-  if (path.endsWith(".js"))   return "application/javascript";
-  if (path.endsWith(".json")) return "application/json";
-  if (path.endsWith(".svg"))  return "image/svg+xml";
-  if (path.endsWith(".png"))  return "image/png";
-  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
-  if (path.endsWith(".ico"))  return "image/x-icon";
+// ======================= SPIFFS ==============================
+String getContentType(String filename) {
+  if (filename.endsWith(".html")) return "text/html";
+  else if (filename.endsWith(".css")) return "text/css";
+  else if (filename.endsWith(".js")) return "application/javascript";
+  else if (filename.endsWith(".json")) return "application/json";
   return "text/plain";
 }
 
-bool handleFileRead(String path){
+bool handleFileRead(String path) {
   if (path.endsWith("/")) path += "index.html";
-  if (!SPIFFS.exists(path)) return false;
-  File file = SPIFFS.open(path, "r");
-  if (!file) return false;
-  server.streamFile(file, contentType(path));
-  file.close();
-  return true;
+  if (SPIFFS.exists(path)) {
+    File file = SPIFFS.open(path, "r");
+    server.streamFile(file, getContentType(path));
+    file.close();
+    return true;
+  }
+  return false;
 }
 
-// ---------- ROUTES ----------
-void handleApiData(){
-  stepSimulation();
-  StaticJsonDocument<128> doc;
-  doc["temp"] = curTemp;
-  doc["hum"]  = curHum;
-  doc["ts"]   = (uint64_t) (millis() + (uint64_t) (time(nullptr)) * 1000ULL); // aproximado
-  String out; serializeJson(doc, out);
-  server.send(200, "application/json", out);
+// ======================= HANDLERS ============================
+void handleRoot() {
+  if (!handleFileRead("/index.html")) {
+    server.send(404, "text/plain", "404: Not Found");
+  }
 }
 
-void handleNotFound(){
-  String path = server.uri();
-  if (handleFileRead(path)) return;
-  server.send(404, "text/plain", "404");
+void handleApiData() {
+  unsigned long now = millis();
+  if (now - lastReadMs >= READ_INTERVAL) {
+    lastReadMs = now;
+    TempAndHumidity data = dht.getTempAndHumidity();
+    if (!isnan(data.temperature) && !isnan(data.humidity)) {
+      lastTemp = data.temperature;
+      lastHum = data.humidity;
+      Serial.printf("Temp: %.1f°C, Hum: %.1f%%\n", lastTemp, lastHum);
+    } else {
+      Serial.println("Error leyendo el DHT22");
+    }
+  }
+
+  DynamicJsonDocument doc(256);
+  doc["temp"] = lastTemp;
+  doc["hum"] = lastHum;
+  doc["ts"] = millis();
+
+  String output;
+  serializeJson(doc, output);
+  server.send(200, "application/json", output);
 }
 
-void setup(){
+void handleNotFound() {
+  if (!handleFileRead(server.uri())) {
+    server.send(404, "text/plain", "404: Not Found");
+  }
+}
+
+// ======================= SETUP ===============================
+void setup() {
   Serial.begin(115200);
   delay(100);
 
-  // FS
-  if (!SPIFFS.begin(true)){
-    Serial.println("Fallo al montar SPIFFS");
-  } else {
-    Serial.println("SPIFFS OK");
-  }
+  Serial.println("\nIniciando ESP32 DHT22...");
 
-  // WiFi
-  WiFi.mode(WIFI_STA);
+  if (!SPIFFS.begin(true)) {
+    Serial.println("Error montando SPIFFS");
+    return;
+  }
+  Serial.println("SPIFFS montado correctamente");
+
+  dht.setup(DHT_PIN, DHTesp::DHT22);
+
+  Serial.printf("Conectando a %s", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.print("Conectando");
-  while (WiFi.status() != WL_CONNECTED){
-    delay(400);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
     Serial.print(".");
   }
-  Serial.printf("\nWiFi OK. IP: %s\n", WiFi.localIP().toString().c_str());
+  Serial.println("\nWiFi conectado!");
+  Serial.print("IP asignada: ");
+  Serial.println(WiFi.localIP());
 
-  // Rutas
+  server.on("/", HTTP_GET, handleRoot);
   server.on("/api/data", HTTP_GET, handleApiData);
   server.onNotFound(handleNotFound);
+
   server.begin();
-  Serial.println("Servidor iniciado");
+  Serial.println("Servidor HTTP iniciado");
 }
 
-void loop(){
+// ======================= LOOP PRINCIPAL ======================
+void loop() {
   server.handleClient();
 }

@@ -1,43 +1,65 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Monitor DHT22</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Monitor DHT22 | ESP32</title>
+  <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script defer src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script defer src="./app.js"></script>
 </head>
 <body>
-  <header class="navbar">
-    <div class="logo">ESP32 Monitor</div>
-    <div class="toggle-theme">
-      <button id="themeToggle">
-        <span id="themeIcon" class="sun">☀️</span>
+  <header class="navbar" role="navigation" aria-label="Barra de navegación">
+    <div class="nav-left">
+      <div class="logo" aria-label="Logo">
+        <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l9 4.87v9.26L12 21l-9-4.87V6.87L12 2zM5.5 8.1v7.05L12 18.9l6.5-3.75V8.1L12 4.35 5.5 8.1z"/></svg>
+        <span>ESP32 Monitor</span>
+      </div>
+    </div>
+
+    <div class="nav-right">
+      <button id="chartBtn" class="icon-btn" title="Ver gráficos" aria-label="Ver gráficos">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v2H3V3zm2 4h3v14H5V7zm5 4h3v10h-3V11zm5-6h3v16h-3V5z"/></svg>
       </button>
+
+      <div class="theme-switch" title="Cambiar tema">
+        <input type="checkbox" id="themeToggle" aria-label="Alternar modo oscuro" />
+        <label for="themeToggle" class="switch">
+          <span class="icon sun" aria-hidden="true">☀️</span>
+          <span class="slider"></span>
+          <span class="icon moon" aria-hidden="true">🌙</span>
+        </label>
+      </div>
     </div>
   </header>
 
   <main class="container">
-    <h1>Monitoreo del Sensor DHT22</h1>
-    <div class="cards">
-      <div class="card">
-        <div class="icon">🌡️</div>
-        <div class="info">
+    <h1>Monitoreo DHT22</h1>
+
+    <section class="cards" aria-live="polite">
+      <article class="card">
+        <div class="card-icon" aria-hidden="true">
+          <svg width="36" height="36" viewBox="0 0 24 24"><path d="M17 13.5V5a5 5 0 10-10 0v8.5a6.5 6.5 0 1010 0zM9 5a3 3 0 116 0v8.5a4.5 4.5 0 11-6 0V5z"/></svg>
+        </div>
+        <div class="card-info">
           <h2>Temperatura</h2>
-          <p id="temp">-- °C</p>
+          <p id="tempVal">-- °C</p>
         </div>
-      </div>
-      <div class="card">
-        <div class="icon">💧</div>
-        <div class="info">
+      </article>
+
+      <article class="card">
+        <div class="card-icon" aria-hidden="true">
+          <svg width="36" height="36" viewBox="0 0 24 24"><path d="M12 2.69L5.64 9.05a7.5 7.5 0 1010.6 0L12 2.69zM12 20a5 5 0 01-5-5c0-2.76 3.06-5.88 5-7.65 1.94 1.77 5 4.89 5 7.65a5 5 0 01-5 5z"/></svg>
+        </div>
+        <div class="card-info">
           <h2>Humedad</h2>
-          <p id="hum">-- %</p>
+          <p id="humVal">-- %</p>
         </div>
-      </div>
-    </div>
-    <button class="btn" id="showChart">📊 Ver Gráficos</button>
+      </article>
+    </section>
+
+    <p class="hint">Actualizando cada 3 s. Datos simulados.</p>
   </main>
 </body>
 </html>
